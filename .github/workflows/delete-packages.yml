@@ -10,8 +10,8 @@ jobs:
       - uses: smartsquaregmbh/delete-old-packages@v0.8.0
         with:
           token: ${{ secrets.GH_PACKAGES_TOKEN }}
-          organization: hotio
+          user: engels74
           type: container
           keep: 0
           names: |
-            requestrr
+            tgraph-bot
