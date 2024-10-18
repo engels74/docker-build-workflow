@@ -1,4 +1,4 @@
-name: delete-packages
+name: delete-testing-packages
 
 on:
   workflow_dispatch:
@@ -10,8 +10,10 @@ jobs:
       - uses: smartsquaregmbh/delete-old-packages@v0.8.1
         with:
           token: ${{ secrets.GH_PACKAGES_TOKEN }}
-          organization: hotio
+          user: engels74
           type: container
+          version-pattern: "^testing.*$"  # Matches 'testing' followed by anything
           keep: 0
+          dry-run: false
           names: |
-            requestrr
+            tgraph-bot
