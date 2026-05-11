@@ -32,14 +32,10 @@ jobs:
               else
                 continue
               fi
-              if upstream_tag_sha_new="$(jq -re '.upstream_tag_sha' < meta.json)"; then
-                commit_message="Upstream update: ${upstream_tag_sha_old} => ${upstream_tag_sha_new}"
-                discord_message="Upstream changes detected: \`${upstream_tag_sha_old}\` => \`${upstream_tag_sha_new}\`"
-              else
-                commit_message="Upstream digest update"
-                discord_message="Upstream digest changes detected."
-              fi
-              [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
+              upstream_tag_sha_new="$(jq -re '.upstream_tag_sha' < meta.json)"
+              commit_message="Upstream update: ${upstream_tag_sha_old} => ${upstream_tag_sha_new}"
+              discord_message="Upstream changes detected: \`${upstream_tag_sha_old}\` => \`${upstream_tag_sha_new}\`"
+              commit_message="${commit_message} [skip ci]"
               git add meta.json
               if git commit -m "${commit_message}"; then
                 git push
