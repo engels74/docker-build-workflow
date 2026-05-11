@@ -1,9 +1,9 @@
-name: update-upstream
+name: update-packages
 
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 */2 * * *'
+    - cron:  '0 1-23/2 * * *'
 
 jobs:
   do-work:
@@ -26,18 +26,18 @@ jobs:
               git clone -b "${BRANCH}" "https://${PERSONAL_TOKEN}@github.com/${REPOSITORY_OWNER}/${REPOSITORY}.git"
               cd "${REPOSITORY}" || exit 1
               ###########################################
-              upstream_tag_sha_old="$(jq -r '.upstream_tag_sha' < meta.json)"
-              if [[ -f update-upstream.sh ]]; then
-                bash update-upstream.sh || true
+              docker run --rm --entrypoint="" -v ${REPOSITORY}:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk update --no-cache && apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | awk '{print $1}' > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND="noninteractive" && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | awk '{print $1}' > ${PACKAGES_HASH}; fi'
+              old_hash="$(jq -r '.packages_hash' < meta.json)"
+              json=$(cat meta.json)
+              jq --sort-keys \
+                  --arg packages_hash "$(cat packages-hash.log)" \
+                  '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json
+              if new_hash="$(jq -re '.packages_hash' < meta.json)"; then
+                commit_message="Packages update: ${old_hash} => ${new_hash}"
+                discord_message="Packages changes detected: \`${old_hash}\` => \`${new_hash}\`"
               else
-                continue
-              fi
-              if upstream_tag_sha_new="$(jq -re '.upstream_tag_sha' < meta.json)"; then
-                commit_message="Upstream update: ${upstream_tag_sha_old} => ${upstream_tag_sha_new}"
-                discord_message="Upstream changes detected: \`${upstream_tag_sha_old}\` => \`${upstream_tag_sha_new}\`"
-              else
-                commit_message="Upstream digest update"
-                discord_message="Upstream digest changes detected."
+                commit_message="Packages update"
+                discord_message="Packages changes detected."
               fi
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
               git add meta.json
