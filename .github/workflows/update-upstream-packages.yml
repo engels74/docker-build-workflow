@@ -35,19 +35,32 @@ jobs:
               ###########################################
               if [[ "${BRANCH}" != *pr ]]; then
                 docker run --rm --entrypoint="" -v ./:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; fi'
+                hash_old=$(jq -r '.packages_hash' < meta.json)
+                hash_new=$(cat packages-hash.log)
                 json=$(cat meta.json)
-                hash=$(cat packages-hash.log)
                 jq --sort-keys \
-                    --arg packages_hash "${hash}" \
+                    --arg packages_hash "${hash_new}" \
                     '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json
+                if [[ "${hash_old}" != "${hash_new}" ]]; then
+                  packages_commit_message="Packages hash change: ${hash_old} => ${hash_new}"
+                  packages_discord_message="Packages hash change detected: \`${hash_old}\` => \`${has_new}\`"
+                fi
               fi
+              upstream_tag_sha_old=$(jq -r '.upstream_tag_sha' < meta.json)
               if [[ -f update-upstream.sh ]]; then
                 bash update-upstream.sh || true
               else
                 continue
               fi
-              commit_message="Upstream/Package update"
-              discord_message="Upstream/Package changes detected."
+              upstream_tag_sha_new="$(jq -re '.upstream_tag_sha' < meta.json)"
+              if [[ "${upstream_tag_sha_old}" != "${upstream_tag_sha_new}" ]]; then
+                upstream_commit_message="Upstream update: ${upstream_tag_sha_old} => ${upstream_tag_sha_new}"
+                upstream_discord_message="Upstream changes detected: \`${upstream_tag_sha_old}\` => \`${upstream_tag_sha_new}\`"
+              fi
+              [[ -n "${packages_commit_message}" ]] && commit_message=" / ${packages_commit_message}"
+              [[ -n "${upstream_commit_message}" ]] && commit_message="${upstream_commit_message}${commit_message}" || commit_message="${packages_commit_message}"
+              [[ -n "${packages_discord_message}" ]] && discord_message=" / ${packages_discord_message}"
+              [[ -n "${upstream_discord_message}" ]] && discord_message="${upstream_discord_message}${discord_message}" || discord_message="${packages_discord_message}"
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
               git add meta.json
               if git commit -m "${commit_message}"; then
