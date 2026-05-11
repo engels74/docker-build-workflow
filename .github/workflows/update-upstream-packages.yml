@@ -34,7 +34,7 @@ jobs:
               cd "${REPOSITORY}" || exit 1
               ###########################################
               if [[ "${BRANCH}" != *pr ]]; then
-                docker run --rm --entrypoint="" -v ${REPOSITORY}:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c "if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | awk '{print \$1}' > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | awk '{print \$1}' > ${PACKAGES_HASH}; fi"
+                docker run --rm --entrypoint="" -v ${REPOSITORY}:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; fi'
                 json=$(cat meta.json)
                 jq --sort-keys \
                     --arg packages_hash "$(cat packages-hash.log)" \
