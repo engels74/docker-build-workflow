@@ -33,18 +33,19 @@ jobs:
               git clone -b "${BRANCH}" "https://${PERSONAL_TOKEN}@github.com/${REPOSITORY_OWNER}/${REPOSITORY}.git"
               cd "${REPOSITORY}" || exit 1
               ###########################################
+              if [[ -f update-upstream.sh ]]; then
+                bash update-upstream.sh >/dev/null 2>&1 || true
+              else
+                continue
+              fi
               if [[ "${BRANCH}" != *pr ]]; then
                 docker run --rm --entrypoint="" -v ./:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; fi'
                 hash_new=$(cat packages-hash.log)
+                rm -f packages-hash.log
                 json=$(cat meta.json)
                 jq --sort-keys \
                     --arg packages_hash "${hash_new}" \
                     '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json
-              fi
-              if [[ -f update-upstream.sh ]]; then
-                bash update-upstream.sh || true
-              else
-                continue
               fi
               commit_message="Upstream or Packages update"
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"

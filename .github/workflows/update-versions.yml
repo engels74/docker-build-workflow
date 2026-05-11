@@ -28,7 +28,7 @@ jobs:
               ###########################################
               old_version="$(jq -r '.version' < meta.json)"
               if [[ -f update-versions.sh ]]; then
-                bash update-versions.sh || true
+                bash update-versions.sh >/dev/null 2>&1  || true
               else
                 continue
               fi
