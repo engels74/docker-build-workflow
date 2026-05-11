@@ -1,9 +1,9 @@
-name: update-packages
+name: update-upstream-packages
 
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 1-23/2 * * *'
+    - cron:  '0 * * * *'
 
 jobs:
   do-work:
@@ -29,10 +29,15 @@ jobs:
               docker run --rm --entrypoint="" -v ${REPOSITORY}:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | awk '{print $1}' > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND="noninteractive" && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | awk '{print $1}' > ${PACKAGES_HASH}; fi'
               json=$(cat meta.json)
               jq --sort-keys \
-                  --arg packages_hash "$(jq -r '.upstream_digest_amd64' < meta.json | cat - packages-hash.log | sha1sum | awk '{print $1}')" \
+                  --arg packages_hash "$(cat packages-hash.log)" \
                   '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json
-              commit_message="Packages update"
-              discord_message="Packages changes detected."
+              if [[ -f update-upstream.sh ]]; then
+                bash update-upstream.sh || true
+              else
+                continue
+              fi
+              commit_message="Upstream/Packages update"
+              discord_message="Upstream/Packages changes detected."
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
               git add meta.json
               if git commit -m "${commit_message}"; then
