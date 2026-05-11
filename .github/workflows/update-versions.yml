@@ -32,9 +32,13 @@ jobs:
               else
                 continue
               fi
-              new_version="$(jq -re '.version' < meta.json)"
-              commit_message="Version update: ${old_version} => ${new_version}"
-              discord_message="Version changes detected: \`${old_version}\` => \`${new_version}\`"
+              if new_version="$(jq -re '.version' < meta.json)"; then
+                commit_message="Version update: ${old_version} => ${new_version}"
+                discord_message="Version changes detected: \`${old_version}\` => \`${new_version}\`"
+              else
+                commit_message="Version update"
+                discord_message="Version changes detected"
+              fi
               git add meta.json
               if git commit -m "${commit_message}"; then
                 git push
