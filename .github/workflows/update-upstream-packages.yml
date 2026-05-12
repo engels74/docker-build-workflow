@@ -39,7 +39,8 @@ jobs:
               fi
               commit_message="Upstream or Packages File update"
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
-              git add meta.json packages.txt >/dev/null 2>&1 || true
+              git add meta.json >/dev/null 2>&1 || true
+              git add packages.txt >/dev/null 2>&1 || true
               if git commit -m "${commit_message}"; then
                 git push
               fi
