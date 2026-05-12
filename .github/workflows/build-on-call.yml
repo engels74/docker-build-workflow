@@ -125,6 +125,13 @@ jobs:
           build-args: |
             ${{ steps.meta.outputs.build-args }}
 
+      - name: Collect Packages File
+        if: (steps.platform-exists.outputs.result == 'ok')
+        env:
+          IMAGE: ghcr.io/${{ steps.meta.outputs.image-tag-full }}
+        run: |
+          docker run --quiet --rm --entrypoint="" -v ${GITHUB_WORKSPACE}/:/repo -e PACKAGES="/repo/packages.txt" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available >/dev/null 2>&1 && apk -v info 2>/dev/null | sort > ${PACKAGES}; else export DEBIAN_FRONTEND=noninteractive && apt-get update >/dev/null 2>&1 && apt-get upgrade -y >/dev/null 2>&1 && dpkg-query --showformat="\${Package}-\${Version}\n" --show 2>/dev/null | sort > ${PACKAGES}; fi'
+
       - name: Smoke Test
         if: (steps.platform-exists.outputs.result == 'ok') && (steps.meta.outputs.do_smoketest == 'ok')
         id: smoketest
@@ -135,23 +142,20 @@ jobs:
           exitcode=0
           docker run --quiet --network host -d --name service "${IMAGE}"
           curl -fsSL --retry-all-errors --retry 60 --retry-max-time 120 -m 10 -b /dev/shm/cookie "${test_url}" --output /dev/null || exitcode=$?
-          docker logs service
+          docker logs service > "smoketest.log" 2>&1
           [[ ${exitcode} == 0 ]] && echo "result=ok" >> $GITHUB_OUTPUT || echo "result=nok" >> $GITHUB_OUTPUT
           exit ${exitcode}
 
-      - name: Commit Packages File
-        if: (steps.platform-exists.outputs.result == 'ok') && (matrix.platform == 'linux-amd64')
-        env:
-          IMAGE: ghcr.io/${{ steps.meta.outputs.image-tag-full }}
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          docker run --quiet --rm --entrypoint="" -v ${GITHUB_WORKSPACE}/:/repo -e PACKAGES="/repo/packages.txt" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available >/dev/null 2>&1 && apk -v info 2>/dev/null | sort > ${PACKAGES}; else export DEBIAN_FRONTEND=noninteractive && apt-get update >/dev/null 2>&1 && apt-get upgrade -y >/dev/null 2>&1 && dpkg-query --showformat="\${Package}-\${Version}\n" --show 2>/dev/null | sort > ${PACKAGES}; fi'
-          git add meta.json >/dev/null 2>&1 || true
-          git add packages.txt >/dev/null 2>&1 || true
-          if git commit -m "Packages File update [skip ci]"; then
-            git push
-          fi
+      - name: Upload Files
+        continue-on-error: true
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: warn
+          name: ${{ github.ref_name }}-${{ github.sha }}-results-${{ matrix.platform }}
+          path: |
+            packages.txt
+            smoketest.log
 
   publish:
     runs-on: ubuntu-24.04
@@ -222,6 +226,33 @@ jobs:
             while read manifest; do
               docker manifest push $(awk '{print $1}' <<< ${manifest})
             done < manifest.list
+
+  packages:
+    runs-on: ubuntu-24.04
+    needs: [build, publish]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Files
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ github.ref_name }}-${{ github.sha }}-results-linux-amd64
+
+      - name: Commit Packages File
+        uses: nick-fields/retry@v4
+        with:
+          max_attempts: 3
+          timeout_minutes: 5
+          retry_wait_seconds: 30
+          command: |
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            rm -f smoketest.log
+            git add packages.txt >/dev/null 2>&1 || true
+            if git commit -m "Packages File update [skip ci]"; then
+              git push
+            fi
 
   tags:
     runs-on: ubuntu-24.04
