@@ -39,13 +39,13 @@ jobs:
                 continue
               fi
               if [[ "${BRANCH}" != *pr ]]; then
-                docker run --rm --entrypoint="" -v ./:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available && apk -vv info | sort | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get upgrade -y && apt list --installed | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; fi'
+                docker run --quiet --rm --entrypoint="" -v ./:/repo -e PACKAGES_HASH="/repo/packages-hash.log" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available >/dev/null 2>&1 && apk -vv info 2>/dev/null | sort | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; else export DEBIAN_FRONTEND=noninteractive && apt-get update >/dev/null 2>&1 && apt-get upgrade -y >/dev/null 2>&1 && apt list --installed 2>/dev/null | sha1sum | cut -f 1 -d " " > ${PACKAGES_HASH}; fi'
                 hash_new=$(cat packages-hash.log)
                 rm -f packages-hash.log
                 json=$(cat meta.json)
                 jq --sort-keys \
                     --arg packages_hash "${hash_new}" \
-                    '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json
+                    '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json >/dev/null 2>&1
               fi
               commit_message="Upstream or Packages update"
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
