@@ -125,19 +125,6 @@ jobs:
           build-args: |
             ${{ steps.meta.outputs.build-args }}
 
-      - name: Commit Packages File
-        if: (steps.platform-exists.outputs.result == 'ok') && (matrix.platform == 'linux-amd64')
-        env:
-          IMAGE: ghcr.io/${{ steps.meta.outputs.image-tag-full }}
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          docker run --quiet --rm --entrypoint="" -v ${GITHUB_WORKSPACE}/:/repo -e PACKAGES="/repo/packages.txt" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available >/dev/null 2>&1 && apk -v info 2>/dev/null | sort > ${PACKAGES}; else export DEBIAN_FRONTEND=noninteractive && apt-get update >/dev/null 2>&1 && apt-get upgrade -y >/dev/null 2>&1 && dpkg-query --showformat="\${Package}-\${Version}\n" --show 2>/dev/null | sort > ${PACKAGES}; fi'
-          git add packages.txt >/dev/null 2>&1 || true
-          if git commit -m "Packages File update [skip ci]"; then
-            git push
-          fi
-
       - name: Smoke Test
         if: (steps.platform-exists.outputs.result == 'ok') && (steps.meta.outputs.do_smoketest == 'ok')
         id: smoketest
@@ -151,6 +138,19 @@ jobs:
           docker logs service
           [[ ${exitcode} == 0 ]] && echo "result=ok" >> $GITHUB_OUTPUT || echo "result=nok" >> $GITHUB_OUTPUT
           exit ${exitcode}
+
+      - name: Commit Packages File
+        if: (steps.platform-exists.outputs.result == 'ok') && (matrix.platform == 'linux-amd64')
+        env:
+          IMAGE: ghcr.io/${{ steps.meta.outputs.image-tag-full }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          docker run --quiet --rm --entrypoint="" -v ${GITHUB_WORKSPACE}/:/repo -e PACKAGES="/repo/packages.txt" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available >/dev/null 2>&1 && apk -v info 2>/dev/null | sort > ${PACKAGES}; else export DEBIAN_FRONTEND=noninteractive && apt-get update >/dev/null 2>&1 && apt-get upgrade -y >/dev/null 2>&1 && dpkg-query --showformat="\${Package}-\${Version}\n" --show 2>/dev/null | sort > ${PACKAGES}; fi'
+          git add packages.txt >/dev/null 2>&1 || true
+          if git commit -m "Packages File update [skip ci]"; then
+            git push
+          fi
 
   publish:
     runs-on: ubuntu-24.04
