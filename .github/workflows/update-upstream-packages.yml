@@ -37,7 +37,7 @@ jobs:
               if [[ "${BRANCH}" != *pr ]]; then
                 docker run --quiet --rm --entrypoint="" -v ./:/repo -e PACKAGES="/repo/packages.txt" "ghcr.io/${REPOSITORY_OWNER}/${REPOSITORY}:${BRANCH}" sh -c 'if grep -q alpine < /etc/os-release; then apk upgrade --no-cache --available >/dev/null 2>&1 && apk -v info 2>/dev/null | sort > ${PACKAGES}; else export DEBIAN_FRONTEND=noninteractive && apt-get update >/dev/null 2>&1 && apt-get upgrade -y >/dev/null 2>&1 && dpkg-query --showformat="\${Package}-\${Version}\n" --show 2>/dev/null | sort > ${PACKAGES}; fi'
               fi
-              commit_message="Upstream or Packages File update"
+              commit_message="Upstream or Packages update"
               [[ "${BRANCH}" == *pr ]] && commit_message="${commit_message} [skip ci]"
               git add meta.json >/dev/null 2>&1 || true
               git add packages.txt >/dev/null 2>&1 || true
