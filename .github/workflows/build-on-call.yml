@@ -131,7 +131,7 @@ jobs:
           IMAGE:           ghcr.io/${{ steps.meta.outputs.image-tag-full }}
           PACKAGE_VERSION: ${{ github.ref_name }}-${{ github.sha }}
         run: |
-          docker run --rm --entrypoint="" -v ${GITHUB_WORKSPACE}:/logs -e LOG="/logs/${PACKAGE_VERSION}-packages.log" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk -vv info | sort > ${LOG} 2>&1; else apt list --installed > ${LOG} 2>&1; fi'
+          docker run --rm --entrypoint="" -v ${GITHUB_WORKSPACE}:/logs -e LOG="/logs/${PACKAGE_VERSION}-packages.log" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk -vv info | sort > ${LOG}; else apt list --installed > ${LOG}; fi'
 
       - name: Smoke Test
         if: (steps.platform-exists.outputs.result == 'ok') && (steps.meta.outputs.do_smoketest == 'ok')
