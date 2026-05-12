@@ -133,6 +133,21 @@ jobs:
         run: |
           docker run --quiet --rm --entrypoint="" -v ${GITHUB_WORKSPACE}:/logs -e LOG="/logs/${PACKAGE_VERSION}-packages.log" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk -vv info | sort > ${LOG}; else apt list --installed > ${LOG}; fi'
 
+      - name: Smoke Test
+        if: (steps.platform-exists.outputs.result == 'ok') && (steps.meta.outputs.do_smoketest == 'ok')
+        id: smoketest
+        env:
+          IMAGE:           ghcr.io/${{ steps.meta.outputs.image-tag-full }}
+          PACKAGE_VERSION: ${{ github.ref_name }}-${{ github.sha }}
+        run: |
+          test_url=$(jq -r '.test_url' < meta.json)
+          exitcode=0
+          docker run --network host -d --name service "${IMAGE}"
+          curl -fsSL --retry-all-errors --retry 60 --retry-max-time 120 -m 10 -b /dev/shm/cookie "${test_url}" --output /dev/null || exitcode=$?
+          docker logs service > "${PACKAGE_VERSION}-test.log" 2>&1
+          [[ ${exitcode} == 0 ]] && echo "result=ok" >> $GITHUB_OUTPUT || echo "result=nok" >> $GITHUB_OUTPUT
+          exit ${exitcode}
+
       - name: Commit Package Hash
         if: (steps.platform-exists.outputs.result == 'ok') && (matrix.platform == 'linux-amd64')
         env:
@@ -149,21 +164,6 @@ jobs:
           if git commit -m "Packages hash update [skip ci]"; then
             git push
           fi
-
-      - name: Smoke Test
-        if: (steps.platform-exists.outputs.result == 'ok') && (steps.meta.outputs.do_smoketest == 'ok')
-        id: smoketest
-        env:
-          IMAGE:           ghcr.io/${{ steps.meta.outputs.image-tag-full }}
-          PACKAGE_VERSION: ${{ github.ref_name }}-${{ github.sha }}
-        run: |
-          test_url=$(jq -r '.test_url' < meta.json)
-          exitcode=0
-          docker run --network host -d --name service "${IMAGE}"
-          curl -fsSL --retry-all-errors --retry 60 --retry-max-time 120 -m 10 -b /dev/shm/cookie "${test_url}" --output /dev/null || exitcode=$?
-          docker logs service > "${PACKAGE_VERSION}-test.log" 2>&1
-          [[ ${exitcode} == 0 ]] && echo "result=ok" >> $GITHUB_OUTPUT || echo "result=nok" >> $GITHUB_OUTPUT
-          exit ${exitcode}
 
       - name: Upload Results
         continue-on-error: true
