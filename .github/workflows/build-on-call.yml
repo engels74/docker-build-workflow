@@ -125,13 +125,30 @@ jobs:
           build-args: |
             ${{ steps.meta.outputs.build-args }}
 
-      - name: List Packages
+      - name: Collect Package Info
         if: (steps.platform-exists.outputs.result == 'ok')
         env:
           IMAGE:           ghcr.io/${{ steps.meta.outputs.image-tag-full }}
           PACKAGE_VERSION: ${{ github.ref_name }}-${{ github.sha }}
         run: |
-          docker run --rm --entrypoint="" -v ${GITHUB_WORKSPACE}:/logs -e LOG="/logs/${PACKAGE_VERSION}-packages.log" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk -vv info | sort > ${LOG}; else apt list --installed > ${LOG}; fi'
+          docker run --quiet --rm --entrypoint="" -v ${GITHUB_WORKSPACE}:/logs -e LOG="/logs/${PACKAGE_VERSION}-packages.log" "${IMAGE}" sh -c 'if grep -q alpine < /etc/os-release; then apk -vv info | sort > ${LOG}; else apt list --installed > ${LOG}; fi'
+
+      - name: Commit Package Hash
+        if: (steps.platform-exists.outputs.result == 'ok') && (matrix.platform == 'linux-amd64')
+        env:
+          PACKAGE_VERSION: ${{ github.ref_name }}-${{ github.sha }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          packages_hash=$(cat "${PACKAGE_VERSION}-packages.log" | sha1sum | cut -f 1 -d " ")
+          json=$(cat meta.json)
+          jq --sort-keys \
+              --arg packages_hash "${packages_hash}" \
+              '.packages_hash = $packages_hash' <<< "${json}" | tee meta.json >/dev/null 2>&1
+          git add meta.json
+          if git commit -m "Packages hash update [skip ci]"; then
+            git push
+          fi
 
       - name: Smoke Test
         if: (steps.platform-exists.outputs.result == 'ok') && (steps.meta.outputs.do_smoketest == 'ok')
