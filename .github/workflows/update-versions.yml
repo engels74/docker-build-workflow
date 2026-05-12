@@ -59,7 +59,7 @@ jobs:
                                 }
                               ]}')
                 jq <<< "${json}"
-                curl -fsSL -X POST -H "Content-Type: application/json" -d "${json}" "${DISCORD_WEBHOOK}"
+                curl -fsSL -X POST -H "Content-Type: application/json" -d "${json}" "${DISCORD_WEBHOOK}"  >/dev/null 2>&1 || true
               fi
               ###########################################
               cd .. || exit 1
