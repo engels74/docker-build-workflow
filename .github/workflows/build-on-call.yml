@@ -125,7 +125,7 @@ jobs:
           build-args: |
             ${{ steps.meta.outputs.build-args }}
 
-      - name: Collect Packages File
+      - name: Create Packages File
         if: (steps.platform-exists.outputs.result == 'ok')
         env:
           IMAGE: ghcr.io/${{ steps.meta.outputs.image-tag-full }}
@@ -146,7 +146,7 @@ jobs:
           [[ ${exitcode} == 0 ]] && echo "result=ok" >> $GITHUB_OUTPUT || echo "result=nok" >> $GITHUB_OUTPUT
           exit ${exitcode}
 
-      - name: Upload Files
+      - name: Upload Artifacts
         continue-on-error: true
         if: always()
         uses: actions/upload-artifact@v7
@@ -234,7 +234,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Download Files
+      - name: Download Artifacts
         uses: actions/download-artifact@v8
         with:
           name: ${{ github.ref_name }}-${{ github.sha }}-results-linux-amd64
@@ -256,7 +256,7 @@ jobs:
 
   tags:
     runs-on: ubuntu-24.04
-    needs: [build, publish]
+    needs: [build, publish, packages]
     steps:
       - name: Update tags
         uses: nick-fields/retry@v4
@@ -354,7 +354,7 @@ jobs:
   notify:
     runs-on: ubuntu-24.04
     if: always()
-    needs: [build, publish, tags]
+    needs: [build, publish, packages, tags]
     steps:
       - name: Send Discord Notification
         uses: nick-fields/retry@v4
