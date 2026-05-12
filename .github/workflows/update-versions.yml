@@ -9,11 +9,6 @@ jobs:
   do-work:
     runs-on: ubuntu-latest
     steps:
-      - name: Git Config
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
       - name: Do Work
         env:
           REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -21,6 +16,8 @@ jobs:
           GITHUB_TOKEN:     ${{ secrets.GITHUB_TOKEN }}
           DISCORD_WEBHOOK:  ${{ secrets.DISCORD_WEBHOOK }}
         run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           while IFS= read -r REPOSITORY; do
             while IFS= read -r BRANCH; do
               git clone -b "${BRANCH}" "https://${PERSONAL_TOKEN}@github.com/${REPOSITORY_OWNER}/${REPOSITORY}.git"
